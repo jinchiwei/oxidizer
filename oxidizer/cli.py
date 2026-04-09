@@ -453,6 +453,26 @@ def write(topic: str, profile: str, section_type: str, output: Optional[Path], m
 
 
 # ---------------------------------------------------------------------------
+# scan command helpers
+# ---------------------------------------------------------------------------
+
+def _severity_color(severity_name: str) -> str:
+    """Return a rich color for a severity level name."""
+    return {
+        "CLEAN": "green",
+        "LOW": "yellow",
+        "MEDIUM": "yellow",
+        "HIGH": "red",
+        "CRITICAL": "bold red",
+    }.get(severity_name, "white")
+
+
+def _char_offset_to_line(text: str, offset: int) -> int:
+    """Convert a character offset to a 1-indexed line number."""
+    return text[:offset].count("\n") + 1
+
+
+# ---------------------------------------------------------------------------
 # scan command
 # ---------------------------------------------------------------------------
 
@@ -460,11 +480,12 @@ def write(topic: str, profile: str, section_type: str, output: Optional[Path], m
 @click.argument("file", type=click.Path(exists=True, path_type=Path))
 @click.option("--profile", "-p", required=True, help="Profile name (e.g. jinchi)")
 def scan(file: Path, profile: str):
-    """Scan FILE for banned words defined in the profile."""
+    """Scan FILE for AI writing patterns using the tiered detection registry."""
     from oxidizer.profiles.loader import load_profile
-    from oxidizer.scoring.metrics import count_banned_words
+    from oxidizer.detection.registry import run_full_detection, Severity
+    from oxidizer.detection.vocabulary import Tier
 
-    # Load profile
+    # Load profile (kept for future use / backward compat)
     try:
         prof = load_profile(profile)
     except FileNotFoundError as e:
@@ -478,19 +499,15 @@ def scan(file: Path, profile: str):
         console.print(f"[red]Error parsing document:[/red] {e}")
         sys.exit(1)
 
-    banned_list = prof.vocabulary.banned_aiisms
-    if not banned_list:
-        console.print(
-            f"[yellow]Profile '{prof.name}' has no banned words configured.[/yellow]"
-        )
-        sys.exit(0)
-
     console.print(f"\n[bold]Scanning:[/bold] {file}")
-    console.print(f"[bold]Profile:[/bold] {prof.name}")
-    console.print(f"[bold]Banned word list:[/bold] {', '.join(banned_list)}\n")
+    console.print(f"[bold]Profile:[/bold] {prof.name}\n")
 
-    total_found = 0
-    any_found = False
+    # Per-severity counts for the summary
+    severity_counts: dict[str, int] = {s.name: 0 for s in Severity}
+    total_p0 = 0
+    total_p1 = 0
+    total_structural = 0
+    total_statistical = 0
 
     for section in sections:
         heading = section.heading or "(untitled)"
@@ -498,47 +515,87 @@ def scan(file: Path, profile: str):
         if not text.strip():
             continue
 
-        found = count_banned_words(text, banned_list)
-        if not found:
+        report = run_full_detection(text, context=section.context)
+        sev_name = report.overall_severity.name
+        severity_counts[sev_name] = severity_counts.get(sev_name, 0) + 1
+        sev_color = _severity_color(sev_name)
+
+        if report.overall_severity == Severity.CLEAN:
+            console.print(
+                f"[bold]Section:[/bold] {heading} "
+                f"[[{sev_color}]{sev_name}[/{sev_color}]] [green]✓[/green]"
+            )
             continue
 
-        any_found = True
-        total_found += len(found)
-
-        table = Table(
-            title=f"Section: {heading}",
-            box=box.SIMPLE,
-            show_header=True,
-            header_style="bold red",
+        # Section header with severity badge
+        console.print(
+            f"[bold]Section:[/bold] {heading} "
+            f"[[{sev_color}]{sev_name}[/{sev_color}]]"
         )
-        table.add_column("Banned Word", style="red bold", min_width=20)
-        table.add_column("Context", min_width=60)
 
-        lines = text.splitlines()
-        for banned_word in found:
-            # Find lines containing this word (case-insensitive)
-            word_lower = banned_word.lower()
-            context_lines: list[str] = []
-            for line_num, line in enumerate(lines, 1):
-                if word_lower in line.lower():
-                    # Show truncated context
-                    truncated = line.strip()
-                    if len(truncated) > 80:
-                        idx = truncated.lower().find(word_lower)
-                        start = max(0, idx - 30)
-                        end = min(len(truncated), idx + len(word_lower) + 30)
-                        truncated = ("..." if start > 0 else "") + truncated[start:end] + ("..." if end < len(truncated) else "")
-                    context_lines.append(f"[dim]L{line_num}:[/dim] {truncated}")
+        # P0 findings (non-exempt) — with replacement suggestions and line numbers
+        p0_findings = [f for f in report.vocab_findings if f.tier == Tier.P0 and not f.context_exempt]
+        for finding in p0_findings:
+            line_num = _char_offset_to_line(text, finding.position)
+            replacement = f" → {finding.replacement}" if finding.replacement else ""
+            console.print(
+                f"  [bold red]P0[/bold red]  "
+                f"[red]\"{finding.term}\"[/red]{replacement} "
+                f"[dim](line {line_num})[/dim]"
+            )
+        total_p0 += len(p0_findings)
 
-            context_str = "\n".join(context_lines[:3])  # Show max 3 occurrences
-            table.add_row(banned_word, context_str)
+        # P1 cluster findings (non-exempt)
+        p1_findings = [f for f in report.vocab_findings if f.tier == Tier.P1 and not f.context_exempt]
+        if p1_findings:
+            terms_str = ", ".join(f'"{f.term}"' for f in p1_findings)
+            console.print(
+                f"  [bold yellow]P1[/bold yellow]  "
+                f"{terms_str} "
+                f"[dim](cluster of {len(p1_findings)})[/dim]"
+            )
+            total_p1 += 1
 
-        console.print(table)
+        # Structural pattern findings
+        for sf in report.structural_findings:
+            console.print(
+                f"  [bold cyan]STRUCTURAL[/bold cyan]  "
+                f"[cyan]{sf.pattern.value}[/cyan]: {sf.description}"
+            )
+        total_structural += len(report.structural_findings)
 
-    if not any_found:
-        console.print(f"[green]No banned words found in {file.name}.[/green]")
-    else:
-        console.print(f"\n[red]Total banned word occurrences found:[/red] {total_found}")
+        # Statistical signals
+        for flag in report.statistical_report.ai_risk_flags:
+            burstiness = report.statistical_report.burstiness
+            if "burstiness" in flag or "metronomic" in flag.lower():
+                display = f"Low burstiness ({burstiness:.2f}) — AI-like uniformity"
+            else:
+                display = flag
+            console.print(
+                f"  [bold magenta]STATISTICAL[/bold magenta]  {display}"
+            )
+        total_statistical += len(report.statistical_report.ai_risk_flags)
+
+        console.print()
+
+    # Document-wide summary
+    n_sections = sum(severity_counts.values())
+    console.print(f"[bold]Document:[/bold] {n_sections} section(s) scanned")
+
+    severity_summary_parts = [
+        f"[{_severity_color(s)}]{s}[/{_severity_color(s)}]: {severity_counts[s]}"
+        for s in ["CLEAN", "LOW", "MEDIUM", "HIGH", "CRITICAL"]
+        if severity_counts.get(s, 0) > 0
+    ]
+    if severity_summary_parts:
+        console.print("  " + " | ".join(severity_summary_parts))
+
+    console.print(
+        f"  P0 findings: {total_p0} | "
+        f"P1 clusters: {total_p1} | "
+        f"Structural: {total_structural} | "
+        f"Statistical: {total_statistical}"
+    )
 
 
 # ---------------------------------------------------------------------------

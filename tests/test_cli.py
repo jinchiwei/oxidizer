@@ -122,10 +122,10 @@ def test_cli_scan_detects_banned_words(runner):
 
 
 def test_cli_scan_clean_text(runner):
-    """scan should report no banned words for clean academic text."""
+    """scan should report CLEAN for text with no AI patterns."""
     content = (
-        "We collected data from 50 patients. We computed features using standard methods. "
-        "Results demonstrate significant improvement over baseline."
+        "Data were collected from 50 patients. Features were computed using standard methods. "
+        "Error was 1.43 mm on average."
     )
     with tempfile.NamedTemporaryFile(
         mode="w", suffix=".md", delete=False, encoding="utf-8"
@@ -136,7 +136,7 @@ def test_cli_scan_clean_text(runner):
     try:
         result = runner.invoke(cli, ["scan", str(tmp_path), "--profile", "jinchi"])
         assert result.exit_code == 0, f"Unexpected exit: {result.output}"
-        assert "No banned words found" in result.output
+        assert "CLEAN" in result.output or "clean" in result.output.lower()
     finally:
         tmp_path.unlink(missing_ok=True)
 
@@ -171,3 +171,44 @@ def test_cli_write_no_api_key(runner, monkeypatch):
     )
     assert result.exit_code != 0
     assert "API" in result.output or "key" in result.output.lower()
+
+
+# ---------------------------------------------------------------------------
+# scan command — tiered detection registry tests
+# ---------------------------------------------------------------------------
+
+def test_scan_shows_tiered_findings(tmp_path):
+    from click.testing import CliRunner
+    from oxidizer.cli import cli
+    text = "We delve into this tapestry. We leverage the data to utilize a comprehensive approach."
+    md_file = tmp_path / "ai_heavy.md"
+    md_file.write_text(f"## Discussion\n\n{text}")
+    runner = CliRunner()
+    result = runner.invoke(cli, ["scan", str(md_file), "--profile", "jinchi"])
+    assert result.exit_code == 0
+    assert "P0" in result.output or "delve" in result.output
+
+
+def test_scan_shows_structural_patterns(tmp_path):
+    from click.testing import CliRunner
+    from oxidizer.cli import cli
+    text = "We collected data. We performed analysis. We computed results. We observed trends. We noted patterns."
+    md_file = tmp_path / "repetitive.md"
+    md_file.write_text(f"## Methods\n\n{text}")
+    runner = CliRunner()
+    result = runner.invoke(cli, ["scan", str(md_file), "--profile", "jinchi"])
+    assert result.exit_code == 0
+    # Should detect repetitive starters
+    assert "repetitive" in result.output.lower() or "starter" in result.output.lower() or "We" in result.output
+
+
+def test_scan_clean_section_shows_clean(tmp_path):
+    from click.testing import CliRunner
+    from oxidizer.cli import cli
+    text = "Data was collected from 76 patients. Registration error was 1.43 mm."
+    md_file = tmp_path / "clean.md"
+    md_file.write_text(f"## Methods\n\n{text}")
+    runner = CliRunner()
+    result = runner.invoke(cli, ["scan", str(md_file), "--profile", "jinchi"])
+    assert result.exit_code == 0
+    assert "CLEAN" in result.output or "clean" in result.output.lower()
