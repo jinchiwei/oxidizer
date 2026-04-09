@@ -32,3 +32,11 @@ nltk_data/
 
 # Claude
 .claude/
+
+# Test outputs
+*.report.json
+restyled*.md
+*.html
+
+# spaCy models
+en_core_web_*
