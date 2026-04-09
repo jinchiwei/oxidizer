@@ -34,4 +34,6 @@ def call_claude(
         max_tokens=max_tokens,
         messages=[{"role": "user", "content": prompt}],
     )
+    if not response.content:
+        raise RuntimeError("Claude API returned empty response (possible refusal or error).")
     return response.content[0].text.strip()

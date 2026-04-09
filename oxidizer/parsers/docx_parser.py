@@ -49,6 +49,11 @@ def parse_docx(path: str) -> list[Section]:
         body = "\n".join(p.text for p in doc.paragraphs).strip()
         return [Section(heading="", body=body, context="other", level=0)]
 
+    # Include pre-heading content (abstract, title, front matter) as first section
+    pre_body = "\n".join(pre_heading).strip()
+    if pre_body:
+        sections.append(Section(heading="", body=pre_body, context="other", level=0))
+
     for level, heading, body_paras in groups:
         body = "\n".join(body_paras).strip()
         context = _classify_context(heading)
