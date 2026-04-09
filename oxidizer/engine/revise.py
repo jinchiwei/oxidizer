@@ -1,6 +1,8 @@
 """Revise engine: restyle existing text to match a StyleProfile."""
 from __future__ import annotations
 
+from oxidizer.detection.registry import run_full_detection, Severity
+from oxidizer.detection.vocabulary import Tier
 from oxidizer.engine.pipeline import (
     PipelineResult,
     extract_and_lock,
@@ -178,7 +180,40 @@ def revise_section(
         )
         retries += 1
 
-    # 4. Verify and score final output
+    # 4. Self-audit pass: if first rewrite triggered AI detection, fix it
+    detection = run_full_detection(restyled, context=section.context)
+    if detection.overall_severity.value >= Severity.MEDIUM.value:
+        audit_lines: list[str] = []
+        audit_lines.append("## Self-Audit: AI Pattern Removal")
+        audit_lines.append("")
+        audit_lines.append("Your previous rewrite was flagged for AI patterns:")
+        audit_lines.append(detection.summary)
+        audit_lines.append("")
+        audit_lines.append("Specific fixes needed:")
+
+        for finding in detection.vocab_findings:
+            if finding.tier == Tier.P0 and not finding.context_exempt:
+                replacement = finding.replacement or "rewrite"
+                audit_lines.append(f'- Replace "{finding.term}" with {replacement}')
+
+        for sf in detection.structural_findings:
+            audit_lines.append(f"- Fix: {sf.description}")
+
+        audit_lines.append("")
+        audit_lines.append(
+            "Rewrite the text below, fixing ONLY the flagged patterns. Keep ALL factual content, "
+            "data, citations, and locked entities intact. Do not change anything that was not flagged."
+        )
+        audit_lines.append("")
+        audit_lines.append("Output ONLY the revised text.")
+        audit_lines.append("")
+        audit_lines.append("### Text to Fix")
+        audit_lines.append(restyled)
+
+        audit_prompt = "\n".join(audit_lines)
+        restyled = call_claude(audit_prompt, model=model, max_tokens=4096, client=client)
+
+    # 5. Verify and score final output
     preservation, style_report, warnings = verify_and_score(restyled, entities, profile)
 
     return PipelineResult(

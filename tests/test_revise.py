@@ -216,3 +216,50 @@ class TestReviseSection:
         assert result.entities is not None
         all_e = result.entities.all_entities()
         assert any("1.43" in e for e in all_e)
+
+
+def test_revise_section_runs_two_passes():
+    """Revise should do a self-audit pass if first output has AI patterns."""
+    from unittest.mock import MagicMock
+    from oxidizer.parsers.markdown_parser import Section
+    from oxidizer.profiles.loader import load_profile
+    from oxidizer.engine.revise import revise_section
+    from pathlib import Path
+
+    profile = load_profile("jinchi", search_paths=[Path(__file__).parent.parent / "profiles"])
+    section = Section(heading="Discussion", body="We explored these results.", context="discussion", level=1)
+
+    # First call returns AI-ish text (has P0 words), second call returns cleaner text
+    first_response = MagicMock()
+    first_response.content = [MagicMock(text="We delve into these results. This serves as a foundation for leveraging the data.")]
+    second_response = MagicMock()
+    second_response.content = [MagicMock(text="We explored these results. This is a foundation for using the data.")]
+
+    mock_client = MagicMock()
+    mock_client.messages.create.side_effect = [first_response, second_response]
+
+    result = revise_section(section, profile, client=mock_client)
+    # Should have called the API twice (first pass + self-audit pass)
+    assert mock_client.messages.create.call_count == 2
+
+
+def test_revise_skips_second_pass_if_clean():
+    """If first pass has no AI patterns, skip the self-audit."""
+    from unittest.mock import MagicMock
+    from oxidizer.parsers.markdown_parser import Section
+    from oxidizer.profiles.loader import load_profile
+    from oxidizer.engine.revise import revise_section
+    from pathlib import Path
+
+    profile = load_profile("jinchi", search_paths=[Path(__file__).parent.parent / "profiles"])
+    section = Section(heading="Methods", body="We collected data.", context="methods", level=1)
+
+    clean_response = MagicMock()
+    clean_response.content = [MagicMock(text="We collected data from 76 patients at our institution.")]
+
+    mock_client = MagicMock()
+    mock_client.messages.create.return_value = clean_response
+
+    result = revise_section(section, profile, client=mock_client)
+    # Only one API call if output is clean
+    assert mock_client.messages.create.call_count == 1
