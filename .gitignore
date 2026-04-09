@@ -40,3 +40,7 @@ restyled*.md
 
 # spaCy models
 en_core_web_*
+
+# Research papers (not part of the tool)
+*.pdf
+*.docx
