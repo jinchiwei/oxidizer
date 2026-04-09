@@ -358,7 +358,7 @@ def revise(file: Path, profile: str, output: Optional[Path], sections: Optional[
 
     # Determine output path
     if output is None:
-        output = file.parent / (file.stem + "_revised" + file.suffix)
+        output = file.parent / (file.stem + "_revised.md")
 
     output.write_text("\n\n".join(revised_parts), encoding="utf-8")
     console.print(f"[green]Revised document written to:[/green] {output}")
@@ -383,6 +383,18 @@ def revise(file: Path, profile: str, output: Optional[Path], sections: Optional[
 
     report_path.write_text(json.dumps(report_data, indent=2), encoding="utf-8")
     console.print(f"[green]Report JSON written to:[/green] {report_path}")
+
+    # Exit non-zero if any section failed preservation
+    failed_preservation = [
+        r for r in all_results
+        if r.preservation is not None and not r.preservation.passed
+    ]
+    if failed_preservation:
+        console.print(
+            f"[red]Warning:[/red] {len(failed_preservation)} section(s) failed preservation checks. "
+            "Some locked entities (citations, numbers, figures) may be missing from the output."
+        )
+        sys.exit(1)
 
 
 # ---------------------------------------------------------------------------
@@ -541,8 +553,18 @@ def diff_cmd(original: Path, revised: Path, profile: Optional[str]):
     """Show styled diff between ORIGINAL and REVISED files."""
     from oxidizer.diff import compute_diff
 
-    original_text = original.read_text(encoding="utf-8")
-    revised_text = revised.read_text(encoding="utf-8")
+    # Extract text content, handling binary formats via parsers
+    if original.suffix.lower() in (".docx", ".pdf"):
+        orig_sections = _parse_document(original)
+        original_text = "\n\n".join(s.body for s in orig_sections if s.body.strip())
+    else:
+        original_text = original.read_text(encoding="utf-8")
+
+    if revised.suffix.lower() in (".docx", ".pdf"):
+        rev_sections = _parse_document(revised)
+        revised_text = "\n\n".join(s.body for s in rev_sections if s.body.strip())
+    else:
+        revised_text = revised.read_text(encoding="utf-8")
 
     original_report = None
     revised_report = None

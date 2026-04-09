@@ -5,9 +5,22 @@ as verbatim substrings in the restyled output text.
 """
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 
 from oxidizer.preservation.extractor import LockedEntities
+
+
+def _entity_present(entity: str, text: str) -> bool:
+    """Check if an entity is present in text, using word boundaries for short entities."""
+    if len(entity) < 20:
+        # Use word boundaries to avoid partial matches like "Fig. 1" in "Fig. 10"
+        pattern = re.escape(entity)
+        # Add word boundary after the entity if it ends with a word character or digit
+        if entity[-1].isalnum():
+            pattern += r'\b'
+        return bool(re.search(pattern, text))
+    return entity in text
 
 
 @dataclass
@@ -51,7 +64,7 @@ def check_entity_preservation(
             missing=[],
         )
 
-    missing: list[str] = [e for e in all_e if e not in output_text]
+    missing: list[str] = [e for e in all_e if not _entity_present(e, output_text)]
     preserved_count = total - len(missing)
 
     return PreservationResult(

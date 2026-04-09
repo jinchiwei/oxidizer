@@ -4,6 +4,7 @@ import pytest
 from oxidizer.preservation.extractor import LockedEntities, extract_entities
 from oxidizer.preservation.checker import (
     PreservationResult,
+    _entity_present,
     check_entity_preservation,
 )
 
@@ -236,3 +237,56 @@ class TestRoundTrip:
         assert result.passed is False
         assert "Table 2" in result.missing
         assert "[2]" in result.missing
+
+
+# ---------------------------------------------------------------------------
+# Word-boundary matching (_entity_present)
+# ---------------------------------------------------------------------------
+
+class TestEntityPresent:
+    """Tests for the _entity_present helper function (Fix 4)."""
+
+    def test_short_entity_exact_match(self):
+        assert _entity_present("Fig. 1", "See Fig. 1 for details.") is True
+
+    def test_fig1_does_not_match_fig10(self):
+        """'Fig. 1' should NOT match inside 'Fig. 10'."""
+        assert _entity_present("Fig. 1", "Results are in Fig. 10.") is False
+
+    def test_fig1_matches_among_many(self):
+        """'Fig. 1' should match when both Fig. 1 and Fig. 10 are present."""
+        assert _entity_present("Fig. 1", "See Fig. 1 and Fig. 10.") is True
+
+    def test_figure1_does_not_match_figure10(self):
+        assert _entity_present("Figure 1", "See Figure 10.") is False
+
+    def test_figure1_matches_exact(self):
+        assert _entity_present("Figure 1", "See Figure 1.") is True
+
+    def test_short_entity_ending_non_alnum(self):
+        """Entities ending with ')' should still match correctly."""
+        assert _entity_present("(Jones, 2023)", "Noted (Jones, 2023) above.") is True
+
+    def test_long_entity_substring_match(self):
+        """Entities >= 20 chars use plain substring matching."""
+        entity = "a" * 20
+        text = "prefix " + entity + " suffix"
+        assert _entity_present(entity, text) is True
+
+    def test_long_entity_not_present(self):
+        entity = "a" * 20
+        assert _entity_present(entity, "short text") is False
+
+    def test_checker_uses_word_boundary_for_fig_refs(self):
+        """Checker must not consider 'Fig. 1' preserved when only 'Fig. 10' exists."""
+        entities = _entities(figure_table_refs=["Fig. 1"])
+        output = "Results shown in Fig. 10."
+        result = check_entity_preservation(entities, output)
+        assert result.passed is False
+        assert "Fig. 1" in result.missing
+
+    def test_checker_passes_when_fig1_present_with_fig10(self):
+        entities = _entities(figure_table_refs=["Fig. 1"])
+        output = "See Fig. 1 and Fig. 10 for details."
+        result = check_entity_preservation(entities, output)
+        assert result.passed is True

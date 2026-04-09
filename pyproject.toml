@@ -32,3 +32,6 @@ oxidizer = "oxidizer.cli:cli"
 
 [tool.setuptools.packages.find]
 include = ["oxidizer*"]
+
+[tool.setuptools.package-data]
+oxidizer = ["../profiles/*.yaml", "../profiles/*.md"]

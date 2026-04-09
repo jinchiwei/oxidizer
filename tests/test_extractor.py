@@ -3,6 +3,7 @@ import pytest
 
 from oxidizer.preservation.extractor import (
     LockedEntities,
+    SEMICOLON_CITATIONS,
     extract_entities,
 )
 
@@ -332,3 +333,61 @@ class TestAllEntities:
         all_e = entities.all_entities()
         assert len(all_e) == len(set(all_e))
         assert sorted(all_e) == sorted(["[1]", "[2]", "95.2%", "MRI", r"$\alpha$", "Figure 1"])
+
+
+# ---------------------------------------------------------------------------
+# Semicolon-separated citations (Fix 5)
+# ---------------------------------------------------------------------------
+
+class TestSemicolonCitations:
+    """Tests for SEMICOLON_CITATIONS regex and extraction integration."""
+
+    def test_regex_matches_two_authors(self):
+        text = "(Smith, 2020; Jones, 2021)"
+        matches = SEMICOLON_CITATIONS.findall(text)
+        assert matches == ["(Smith, 2020; Jones, 2021)"]
+
+    def test_regex_matches_three_authors(self):
+        text = "(Adams, 2019; Brown, 2020; Clark, 2021)"
+        matches = SEMICOLON_CITATIONS.findall(text)
+        assert matches == ["(Adams, 2019; Brown, 2020; Clark, 2021)"]
+
+    def test_regex_matches_et_al_in_group(self):
+        text = "(Smith et al., 2020; Jones, 2021)"
+        matches = SEMICOLON_CITATIONS.findall(text)
+        assert matches == ["(Smith et al., 2020; Jones, 2021)"]
+
+    def test_regex_does_not_match_single_author(self):
+        """A single author-year with no semicolons should NOT match the semicolon pattern."""
+        text = "(Smith, 2020)"
+        matches = SEMICOLON_CITATIONS.findall(text)
+        assert matches == []
+
+    def test_extract_semicolon_citation_as_single_entity(self):
+        text = "Multiple studies (Smith, 2020; Jones, 2021) confirm this."
+        entities = extract_entities(text)
+        assert "(Smith, 2020; Jones, 2021)" in entities.citations
+
+    def test_extract_does_not_double_count_individual_parts(self):
+        """Individual author-year citations inside a semicolon group should not
+        also appear as separate citation entities."""
+        text = "See (Smith, 2020; Jones, 2021) for details."
+        entities = extract_entities(text)
+        # The whole group should be present
+        assert "(Smith, 2020; Jones, 2021)" in entities.citations
+        # The individual parts should NOT be separately listed
+        assert "(Smith, 2020)" not in entities.citations
+        assert "(Jones, 2021)" not in entities.citations
+
+    def test_extract_mixes_semicolon_and_single_citations(self):
+        """Semicolon groups and standalone citations can coexist."""
+        text = "See [1] and (Smith, 2020; Jones, 2021) and (Adams, 2019)."
+        entities = extract_entities(text)
+        assert "[1]" in entities.citations
+        assert "(Smith, 2020; Jones, 2021)" in entities.citations
+        assert "(Adams, 2019)" in entities.citations
+
+    def test_extract_deduplicates_semicolon_citations(self):
+        text = "As noted (Smith, 2020; Jones, 2021) and again (Smith, 2020; Jones, 2021)."
+        entities = extract_entities(text)
+        assert entities.citations.count("(Smith, 2020; Jones, 2021)") == 1

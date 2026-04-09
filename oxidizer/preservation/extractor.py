@@ -66,6 +66,11 @@ _RE_FIGURE_TABLE_REF = re.compile(
     r"\b(?:Supplementary\s+)?(?:Figure|Table|Fig\.)\s+\d+\b"
 )
 
+# Semicolon-separated author-year citations: (Smith, 2020; Jones, 2021)
+SEMICOLON_CITATIONS = re.compile(
+    r"\([A-Z][a-z]+(?:\s+et\s+al\.?)?,?\s*\d{4}(?:\s*;\s*[A-Z][a-z]+(?:\s+et\s+al\.?)?,?\s*\d{4})+\)"
+)
+
 
 # ---------------------------------------------------------------------------
 # LockedEntities dataclass
@@ -115,8 +120,21 @@ def _dedupe(items: list[str]) -> list[str]:
 
 def _extract_citations(text: str) -> list[str]:
     numbered = _RE_NUMBERED_CITATION.findall(text)
-    author_year = _RE_AUTHOR_YEAR_CITATION.findall(text)
-    return _dedupe(numbered + author_year)
+    # Semicolon-separated multi-author citations must be matched before single
+    # author-year citations so that the whole group is captured as one entity.
+    semicolon = SEMICOLON_CITATIONS.findall(text)
+    # Build a set of spans already covered by semicolon matches so we don't
+    # double-count the individual author-year citations inside them.
+    semicolon_spans = [m.span() for m in SEMICOLON_CITATIONS.finditer(text)]
+
+    author_year: list[str] = []
+    for m in _RE_AUTHOR_YEAR_CITATION.finditer(text):
+        start, end = m.span()
+        in_semicolon = any(s <= start and end <= e for s, e in semicolon_spans)
+        if not in_semicolon:
+            author_year.append(m.group(0))
+
+    return _dedupe(numbered + semicolon + author_year)
 
 
 def _extract_numbers(text: str) -> list[str]:
