@@ -1,0 +1,84 @@
+name: "Jinchi Wei"
+version: 1
+source_documents:
+  - "MSE Thesis (2021)"
+  - "SPIE Conference Paper (2024)"
+  - "ARIA Perspective Paper (2025)"
+
+metrics:
+  sentence_length:
+    mean: 24.1
+    median: 23
+    std: 10.1
+    range: [6, 77]
+  paragraph_length:
+    mean: 71
+    sentences_per_paragraph: [3, 4]
+  voice:
+    active_ratio: 0.90
+    passive_contexts: ["methods", "experimental setup"]
+  contractions: false
+  type_token_ratio: 0.346
+
+transitions:
+  preferred: ["while", "however", "additionally", "as such", "as a result", "similarly", "to address", "collectively"]
+  acceptable: ["furthermore", "notably", "conversely", "given that"]
+
+vocabulary:
+  preferred: ["attained", "robust", "scalable", "holistic", "readily", "promising", "building upon", "as well"]
+  banned_aiisms:
+    - "delve"
+    - "tapestry"
+    - "multifaceted"
+    - "pivotal"
+    - "groundbreaking"
+    - "cutting-edge"
+    - "transformative"
+    - "unravel"
+    - "plethora"
+    - "myriad"
+    - "foster"
+    - "harness"
+    - "harnessing"
+    - "elevate"
+    - "streamline"
+    - "realm"
+    - "intricacies"
+    - "synergy"
+    - "innovative"
+    - "novel"
+    - "embark"
+    - "navigate"
+    - "landscape"
+    - "cornerstone"
+    - "at its core"
+    - "it's worth noting"
+    - "it's important to note"
+    - "in today's world"
+
+punctuation:
+  semicolons_per_100_sentences: 12
+  parenthetical_pairs_per_100_sentences: 25
+  em_dashes: 0
+  inline_enumerations: true
+
+voice_rules:
+  person: "we"
+  hedging: ["would likely", "could theoretically", "most likely"]
+  reasoning: true
+  problem_before_solution: true
+  quantitative_precision: true
+
+style_prompt_file: "custom_style_prompt.md"
+
+few_shot_examples:
+  - category: "problem_framing"
+    text: "The negative results of these circumstances include inefficient delegation of physician efforts and time, billions of dollars in unnecessary clinical spending, and ultimately poorer health outcomes."
+  - category: "methods_with_reasoning"
+    text: "We realized there were two main problems with our goal of both segmenting and anatomically labeling individual vertebra: 1. Vertebra are not very distinct in appearance from their neighbors, creating problems distinguishing vertebra from each other, and 2. ground truth in 3D generally includes all of the vertebrae, including body and projections."
+  - category: "results_with_precision"
+    text: "Registration error using only the transverse scans was 1.43 +/- 0.30 mm."
+  - category: "honest_limitations"
+    text: "While only 2 images were correctly classified, 11/16 images were classified as Stages 3 or 5, showing that the network recognized the true labels were around 4 but was not precise enough to make the final distinction."
+  - category: "clinical_review"
+    text: "Compromised vessel integrity can result in vasogenic edema and extraparenchymal effusion (ARIA-E), microhemorrhages and superficial siderosis (ARIA-H), or a combination thereof."
