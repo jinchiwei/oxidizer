@@ -63,6 +63,16 @@ class FewShotExample:
 
 
 @dataclass
+class AIDetectionConfig:
+    """Configuration for AI detection strictness."""
+    p2_density_threshold: int = 3
+    p2_density_threshold_long: int = 5
+    structural_enabled: bool = True
+    statistical_enabled: bool = True
+    context_exemptions: dict = field(default_factory=dict)
+
+
+@dataclass
 class StyleProfile:
     name: str
     version: int
@@ -78,3 +88,4 @@ class StyleProfile:
     voice_rules: VoiceRules
     style_prompt: Optional[str]
     few_shot_examples: list[FewShotExample]
+    ai_detection: AIDetectionConfig = field(default_factory=AIDetectionConfig)

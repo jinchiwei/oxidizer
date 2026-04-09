@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Optional
 
 from oxidizer.profiles.schema import (
+    AIDetectionConfig,
     FewShotExample,
     ParagraphMetrics,
     PunctuationMetrics,
@@ -163,6 +164,19 @@ def load_profile_from_path(path: Path) -> StyleProfile:
         for ex in data.get("few_shot_examples", [])
     ]
 
+    # --- AIDetectionConfig ---
+    ad = data.get("ai_detection", {})
+    if ad:
+        ai_detection = AIDetectionConfig(
+            p2_density_threshold=int(ad.get("p2_density_threshold", 3)),
+            p2_density_threshold_long=int(ad.get("p2_density_threshold_long", 5)),
+            structural_enabled=bool(ad.get("structural_enabled", True)),
+            statistical_enabled=bool(ad.get("statistical_enabled", True)),
+            context_exemptions=dict(ad.get("context_exemptions", {})),
+        )
+    else:
+        ai_detection = AIDetectionConfig()
+
     return StyleProfile(
         name=data["name"],
         version=int(data["version"]),
@@ -178,4 +192,5 @@ def load_profile_from_path(path: Path) -> StyleProfile:
         voice_rules=voice_rules,
         style_prompt=style_prompt,
         few_shot_examples=few_shot_examples,
+        ai_detection=ai_detection,
     )

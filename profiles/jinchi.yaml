@@ -82,3 +82,14 @@ few_shot_examples:
     text: "While only 2 images were correctly classified, 11/16 images were classified as Stages 3 or 5, showing that the network recognized the true labels were around 4 but was not precise enough to make the final distinction."
   - category: "clinical_review"
     text: "Compromised vessel integrity can result in vasogenic edema and extraparenchymal effusion (ARIA-E), microhemorrhages and superficial siderosis (ARIA-H), or a combination thereof."
+
+ai_detection:
+  p2_density_threshold: 3
+  p2_density_threshold_long: 5
+  structural_enabled: true
+  statistical_enabled: true
+  context_exemptions:
+    robust: ["methods", "results"]
+    significant: ["results"]
+    comprehensive: ["methods"]
+    facilitate: ["methods"]
