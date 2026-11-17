@@ -4,6 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from oxidizer.llm import call_claude
+from oxidizer.engine.style_rules import style_rules
 from oxidizer.profiles.schema import StyleProfile
 from oxidizer.scoring.reporter import StyleReport, compute_style_report
 
@@ -52,41 +53,15 @@ def build_write_prompt(
     # ------------------------------------------------------------------ #
     # Core rules
     # ------------------------------------------------------------------ #
-    lines.append("## Style Rules")
-    lines.append('- Always use first-person plural: write "we" (not "I" or passive-only constructions).')
-    lines.append(
-        f"- Target sentence length: mean ~{profile.sentence_length.mean:.0f} words "
-        f"(std ~{profile.sentence_length.std:.0f}). Range: "
-        f"{profile.sentence_length.range_min}–{profile.sentence_length.range_max} words."
-    )
-    semi = profile.punctuation.semicolons_per_100
-    if semi > 0:
-        lines.append(f"- Use semicolons purposefully; target ~{semi:.0f} per 100 sentences.")
-    lines.append("- Do NOT use em dashes (—). Rewrite any em-dash constructions as separate clauses.")
-    lines.append("- Do NOT use contractions (e.g. don't → do not, it's → it is).")
-    lines.append("- Do NOT use passive voice except in methods/experimental sections.")
-
-    if profile.vocabulary.banned_aiisms:
-        banned_str = ", ".join(f'"{w}"' for w in profile.vocabulary.banned_aiisms)
-        lines.append(f"- NEVER use these banned AI-ism words/phrases: {banned_str}.")
-
-    if profile.transitions.preferred:
-        pref_str = ", ".join(f'"{t}"' for t in profile.transitions.preferred)
-        lines.append(f"- Prefer these transition words: {pref_str}.")
-
-    if profile.vocabulary.preferred:
-        vocab_str = ", ".join(f'"{w}"' for w in profile.vocabulary.preferred)
-        lines.append(f"- Preferred vocabulary: {vocab_str}.")
-
-    lines.append("- State the problem before proposing the solution.")
-    lines.append("- Be precise and quantitative; do not soften claims without evidence.")
-    lines.append("- Do NOT hallucinate facts, statistics, or citations. Only include information provided in the topic/prompt.")
+    lines.extend(style_rules(profile))
+    lines.append("- Do NOT hallucinate facts, statistics, or citations.")
     lines.append("")
 
     # ------------------------------------------------------------------ #
     # Section type context
     # ------------------------------------------------------------------ #
     section_guidance = {
+        "personal": "Write a personal reflection using only the supplied perspective and experiences.",
         "intro": (
             "Write an Introduction section. Establish the clinical or scientific problem, "
             "motivate the work, and close with a clear statement of objectives."
@@ -126,7 +101,7 @@ def build_write_prompt(
     # ------------------------------------------------------------------ #
     lines.append("## Task")
     lines.append(
-        "Generate new academic text for the topic below. "
+        "Generate text for the requested section and topic below. "
         "Match the style described above exactly. "
         "Output ONLY the generated text — no commentary, no preamble, no markdown headers."
     )

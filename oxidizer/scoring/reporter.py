@@ -175,7 +175,7 @@ def compute_style_report(text: str, profile: StyleProfile) -> StyleReport:
     sub_scores["transitions"] = transition_sc  # already in [0, 1]
 
     # Contractions: 1.0 if zero, else 0.0
-    sub_scores["contractions"] = 1.0 if contractions == 0 else 0.0
+    sub_scores["contractions"] = 1.0 if profile.contractions or contractions == 0 else 0.0
 
     # ------------------------------------------------------------------ #
     # Weighted composite

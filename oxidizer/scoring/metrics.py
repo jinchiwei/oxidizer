@@ -109,15 +109,15 @@ ALL_TRANSITIONS: list[str] = [
 # ---------------------------------------------------------------------------
 
 def _sent_tokenize(text: str) -> list[str]:
-    """Tokenize *text* into sentences using NLTK, downloading if needed."""
+    """Tokenize with explicitly provisioned resources; never install during scoring."""
     try:
         from nltk.tokenize import sent_tokenize
         return sent_tokenize(text)
-    except LookupError:
-        import nltk
-        nltk.download("punkt_tab", quiet=True)
-        from nltk.tokenize import sent_tokenize
-        return sent_tokenize(text)
+    except LookupError as exc:
+        raise RuntimeError(
+            'Install punkt_tab inside the project environment first: '
+            'python -m nltk.downloader -d "$VIRTUAL_ENV/nltk_data" punkt_tab'
+        ) from exc
 
 
 # ---------------------------------------------------------------------------

@@ -32,6 +32,7 @@ nltk_data/
 
 # Claude
 .claude/
+.oxidizer/
 
 # Test outputs
 *.report.json

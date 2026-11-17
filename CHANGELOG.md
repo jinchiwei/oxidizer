@@ -2,6 +2,15 @@
 
 All notable changes to Oxidizer will be documented in this file.
 
+## [0.2.0] - 2026-11-16
+
+- Add separate personal/academic corpus, brief, guide, tuning, evaluation, drafting, feedback and export commands.
+- Freeze publication groups, reserve recent writing, compare anonymous drafts in both orders, and keep factual fidelity separate from style preference.
+- Cache bounded model calls; support existing Claude CLI login, optional API, and offline prompt export.
+- Respect profile-specific pronouns, contractions and punctuation in writing/revision; stop penalizing allowed contractions.
+- Remove implicit NLP resource downloads. Keep personal material in ignored local storage.
+- Keep initial learned guides as the drafting default; tuning is not automatically promoted.
+
 ## [0.1.0.0] - 2026-04-08
 
 ### Added

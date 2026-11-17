@@ -189,6 +189,10 @@ def cli():
     pass
 
 
+from oxidizer.voice.cli import voice
+cli.add_command(voice)
+
+
 # ---------------------------------------------------------------------------
 # score command
 # ---------------------------------------------------------------------------
@@ -405,7 +409,7 @@ def revise(file: Path, profile: str, output: Optional[Path], sections: Optional[
 @click.argument("topic")
 @click.option("--profile", "-p", required=True, help="Profile name (e.g. jinchi)")
 @click.option("--section", "section_type", required=True,
-              type=click.Choice(["intro", "methods", "results", "discussion", "other"]),
+              type=click.Choice(["intro", "methods", "results", "discussion", "other", "personal"]),
               help="Section type to generate")
 @click.option("--output", "-o", type=click.Path(path_type=Path), default=None, help="Output file path")
 @click.option("--model", default="claude-sonnet-4-20250514", help="Claude model to use")
